@@ -1,7 +1,6 @@
 import { DataLoader } from './data-loader.js';
 import { Visualization } from './visualization.js';
 import { config } from './config.js';
-import { config } from './config.js';
 
 /**
  * 应用主程序 - 事件处理和界面控制
