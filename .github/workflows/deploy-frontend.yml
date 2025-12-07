@@ -28,6 +28,17 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
+        continue-on-error: false
+
+      - name: Verify GitHub Secrets
+        run: |
+          if [ -z "${{ secrets.API_BASE_URL }}" ]; then
+            echo "::error::API_BASE_URL secret is not configured"
+            echo "Please go to Settings → Secrets and variables → Actions → New repository secret"
+            echo "Add secret name: API_BASE_URL"
+            exit 1
+          fi
+          echo "✅ API_BASE_URL secret is configured"
 
       - name: Update API Configuration
         env:
@@ -65,22 +76,22 @@ jobs:
           
           echo "   API Base URL: ${API_BASE_URL%%/*}..." # 只显示协议部分
 
+      - name: Prepare deployment files
+        run: |
+          # 创建临时部署目录
+          mkdir -p deploy-temp
+          
+          # 只复制前端必需的文件
+          cp -r js deploy-temp/
+          cp index.html deploy-temp/
+          
+          echo "✅ 部署文件准备完成"
+          echo "   已复制: js/, index.html"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
-          exclude: |
-            api/
-            .github/
-            *.md
-            *.toml
-            *.yaml
-            *.json
-            !package.json
-            requirements.txt
-            Procfile
-            .gitignore
-            .vscode/
+          path: deploy-temp
 
       - name: Deploy to GitHub Pages
         id: deployment
