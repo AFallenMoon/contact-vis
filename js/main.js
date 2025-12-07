@@ -1,5 +1,4 @@
 import { App } from './app.js';
-import './config.js'; // 确保配置先加载
 import './visualization-trajectory.js';
 
 // 初始化应用入口
