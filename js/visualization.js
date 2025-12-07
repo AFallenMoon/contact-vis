@@ -14,7 +14,7 @@ export class Visualization {
         this.queryLegendControl = null; // 查询地图图例控件
         this.displayMode = 'all'; // 显示模式: 'all' 全部, 'direct' 密接, 'indirect' 次密接
         this.queryContactType = 'direct'; // 查询结果当前显示类型: 'direct' 密接, 'indirect' 次密接
-        this.currentDirectContacts = []; // 当前查询的直接密接数据
+        this.currentDirectContacts = []; // 当前查询的密接数据
         this.currentSecondaryContacts = []; // 当前查询的次密接数据
         this.currentQueryUserId = null; // 当前查询的用户ID
         this.isAdjustingQueryMapView = false; // 标志：是否正在程序性调整查询地图视图
@@ -285,16 +285,12 @@ export class Visualization {
                         <div class="font-semibold text-slate-900 mb-2 text-xs">接触点类型</div>
                         <div class="flex flex-col gap-2">
                             <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#dc2626] border border-white"></span>
-                                <span class="text-[10px] font-medium text-slate-700">密接接触点</span>
+                                <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white" style="background-color: ${config.colors.contact.direct};"></span>
+                                <span class="text-[10px] font-medium text-slate-700">只包含密接</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#f59e0b] border border-white"></span>
-                                <span class="text-[10px] font-medium text-slate-700">次密接接触点</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#667eea] border border-white"></span>
-                                <span class="text-[10px] font-medium text-slate-700">混合接触点</span>
+                                <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white" style="background-color: ${config.colors.contact.indirect};"></span>
+                                <span class="text-[10px] font-medium text-slate-700">包含次密接</span>
                             </div>
                         </div>
                     </div>
@@ -360,22 +356,18 @@ export class Visualization {
                 </div>
             `;
         } else {
-            // 标记点图例（紧凑且无阴影）
+            // 标记点图例（紧凑且无阴影）- 两类：只包含密接、包含次密接
             div.innerHTML = `
                 <div class="rounded-md bg-white border border-slate-300 px-3 py-2">
                     <div class="font-semibold text-slate-900 mb-2 text-xs">接触点类型</div>
                     <div class="flex flex-col gap-2">
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#dc2626] border border-white"></span>
-                            <span class="text-[10px] font-medium text-slate-700">密接接触点</span>
+                            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white" style="background-color: ${config.colors.contact.direct};"></span>
+                            <span class="text-[10px] font-medium text-slate-700">密接</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#f59e0b] border border-white"></span>
-                            <span class="text-[10px] font-medium text-slate-700">次密接接触点</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#667eea] border border-white"></span>
-                            <span class="text-[10px] font-medium text-slate-700">混合接触点</span>
+                            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white" style="background-color: ${config.colors.contact.indirect};"></span>
+                            <span class="text-[10px] font-medium text-slate-700">密接 + 次密接</span>
                         </div>
                     </div>
                 </div>
@@ -970,11 +962,11 @@ export class Visualization {
                     maxZoom: 18, // 允许所有缩放级别
                     minOpacity: 0.05,
                     gradient: {
-                        0.0: 'blue',
-                        0.25: 'cyan',
-                        0.5: 'lime',
-                        0.75: 'yellow',
-                        1.0: 'red'
+                        0.0: config.colors.heatmap.blue,
+                        0.25: config.colors.heatmap.cyan,
+                        0.5: config.colors.heatmap.lime,
+                        0.75: config.colors.heatmap.yellow,
+                        1.0: config.colors.heatmap.red
                     }
                     // 不设置max，让Leaflet.heat根据点密度自动计算
                 }).addTo(this.map);
@@ -1011,14 +1003,14 @@ export class Visualization {
                 const hasIndirect = group.indirect > 0;
                 const count = group.direct + group.indirect;
                 
-                // 确定颜色
+                // 确定颜色：两类 - 密接（只有direct）、次密接（有indirect，包括混合）
                 let color;
-                if (hasDirect && hasIndirect) {
-                    color = "#667eea"; // 混合
-                } else if (hasDirect && !hasIndirect) {
-                    color = "#dc2626"; // 密接
+                if (hasIndirect) {
+                    // 有次密接（包括混合情况），统一显示为次密接
+                    color = config.colors.contact.indirect;
                 } else {
-                    color = "#f59e0b"; // 次密接
+                    // 只有密接
+                    color = config.colors.contact.direct;
                 }
                 
                 visiblePoints.push({
@@ -1127,28 +1119,21 @@ export class Visualization {
     /**
      * 创建标记图标（固定大小，优化性能）
      * @param {number} count - 接触点数量
-     * @param {boolean} hasDirect - 是否有直接密接
+     * @param {boolean} hasDirect - 是否有密接
      * @param {boolean} hasIndirect - 是否有次密接
      * @param {number} zoomLevel - 地图缩放级别（已废弃，保持固定大小）
      */
     createMarkerIcon(count, hasDirect, hasIndirect, zoomLevel = null) {
         let color, hoverColor;
-        if (hasDirect && hasIndirect) {
-            // 混合：既有直接密接又有次密接
-            color = "#667eea"; // 混合
-            hoverColor = "#818cf8"; // 混合悬浮 (indigo-400)
-        } else if (hasDirect && !hasIndirect) {
-            // 只有直接密接
-            color = "#dc2626"; // 密接 (rose-600)
-            hoverColor = "#ef4444"; // 密接悬浮 (rose-500)
-        } else if (hasIndirect && !hasDirect) {
-            // 只有次密接
-            color = "#f59e0b"; // 次密接 (amber-500)
-            hoverColor = "#fbbf24"; // 次密接悬浮 (amber-400)
+        // 两类：密接（只有direct）、次密接（有indirect，包括混合）
+        if (hasIndirect) {
+            // 有次密接（包括混合情况），统一显示为次密接
+            color = config.colors.contact.indirect;
+            hoverColor = config.colors.contact.indirectHover;
         } else {
-            // 默认情况（理论上不应该发生）
-            color = "#dc2626"; // 密接 (rose-600)
-            hoverColor = "#ef4444"; // 密接悬浮 (rose-500)
+            // 只有密接
+            color = config.colors.contact.direct;
+            hoverColor = config.colors.contact.directHover;
         }
         
         // 使用固定大小，提高性能
@@ -1278,13 +1263,14 @@ export class Visualization {
                 heatmapPoints.push([lat, lng, count]);
                 
                 // 收集 Canvas 渲染数据
+                // 两类：密接（只有direct）、次密接（有indirect，包括混合）
                 let color;
-                if (hasDirect && hasIndirect) {
-                    color = "#667eea";
-                } else if (hasDirect && !hasIndirect) {
-                    color = "#dc2626";
+                if (hasIndirect) {
+                    // 有次密接（包括混合情况），统一显示为次密接
+                    color = config.colors.contact.indirect;
                 } else {
-                    color = "#f59e0b";
+                    // 只有密接
+                    color = config.colors.contact.direct;
                 }
                 
                 // 构建弹出框内容
@@ -1353,28 +1339,21 @@ export class Visualization {
     /**
      * 创建查询地图标记图标（固定大小，优化性能）
      * @param {number} count - 接触点数量
-     * @param {boolean} hasDirect - 是否有直接密接
+     * @param {boolean} hasDirect - 是否有密接
      * @param {boolean} hasIndirect - 是否有次密接
      * @param {number} zoomLevel - 地图缩放级别（已废弃，保持固定大小）
      */
     createQueryMapIcon(count, hasDirect, hasIndirect, zoomLevel = null) {
         let color, hoverColor;
-        if (hasDirect && hasIndirect) {
-            // 混合：既有直接密接又有次密接
-            color = "#667eea"; // 混合
-            hoverColor = "#818cf8"; // 混合悬浮 (indigo-400)
-        } else if (hasDirect && !hasIndirect) {
-            // 只有直接密接
-            color = "#dc2626"; // 密接 (rose-600)
-            hoverColor = "#ef4444"; // 密接悬浮 (rose-500)
-        } else if (hasIndirect && !hasDirect) {
-            // 只有次密接
-            color = "#f59e0b"; // 次密接 (amber-500)
-            hoverColor = "#fbbf24"; // 次密接悬浮 (amber-400)
+        // 两类：密接（只有direct）、次密接（有indirect，包括混合）
+        if (hasIndirect) {
+            // 有次密接（包括混合情况），统一显示为次密接
+            color = config.colors.contact.indirect;
+            hoverColor = config.colors.contact.indirectHover;
         } else {
-            // 默认情况（理论上不应该发生）
-            color = "#dc2626"; // 密接 (rose-600)
-            hoverColor = "#ef4444"; // 密接悬浮 (rose-500)
+            // 只有密接
+            color = config.colors.contact.direct;
+            hoverColor = config.colors.contact.directHover;
         }
         
         // 使用固定大小，提高性能
@@ -1403,7 +1382,7 @@ export class Visualization {
         this.currentQueryUserId = userId;
         this.currentDirectContacts = directContacts;
         this.currentSecondaryContacts = secondaryContacts;
-        this.queryContactType = 'direct'; // 默认显示直接密接
+        this.queryContactType = 'direct'; // 默认显示密接
 
         // 绘制地图（异步，不等待完成，避免阻塞 UI）
         this.drawQueryResultsMap(userId, directContacts, secondaryContacts).catch(err => {
@@ -1471,14 +1450,14 @@ export class Visualization {
             const baseClasses = 'contact-type-btn flex-1 py-3 text-sm font-medium transition';
             
             if (this.queryContactType === 'direct') {
-                // 直接密接按钮：激活状态（黑色），悬浮时保持不变
+                // 密接按钮：激活状态（黑色），悬浮时保持不变
                 directBtn.className = `${baseClasses} border-r border-slate-200 bg-slate-900 hover:bg-slate-900 text-white`;
                 // 次密接按钮：未激活状态（白色），悬浮时稍微加深
                 indirectBtn.className = `${baseClasses} bg-white hover:bg-slate-50 text-slate-700`;
             } else {
                 // 次密接按钮：激活状态（黑色），悬浮时保持不变
                 indirectBtn.className = `${baseClasses} bg-slate-900 hover:bg-slate-900 text-white`;
-                // 直接密接按钮：未激活状态（白色），悬浮时稍微加深
+                // 密接按钮：未激活状态（白色），悬浮时稍微加深
                 directBtn.className = `${baseClasses} border-r border-slate-200 bg-white hover:bg-slate-50 text-slate-700`;
             }
             
@@ -1503,7 +1482,7 @@ export class Visualization {
         // 结果列表渲染逻辑
         if (!userId) {
             // 没有查询用户时，显示提示信息
-            const typeText = this.queryContactType === 'direct' ? '直接密接' : '次密接';
+            const typeText = this.queryContactType === 'direct' ? '密接' : '次密接';
             resultsContainer.innerHTML = `
                 <div class="text-sm md:text-base text-slate-500 text-center py-8">
                     输入用户 ID 查询${typeText}记录
@@ -2009,7 +1988,7 @@ export class Visualization {
             
             // 使用标准 Leaflet 折线绘制轨迹
             const polyline = L.polyline(points, {
-                color: '#667eea',
+                color: config.colors.trajectory.line,
                 weight: 4,
                 opacity: 0.7,
                 lineCap: 'round',
@@ -2021,7 +2000,7 @@ export class Visualization {
             // 起点标记（红色圆点）
             const startMarker = L.circleMarker(startPoint, {
                 radius: 7.5,
-                fillColor: 'red',
+                fillColor: config.colors.trajectory.start,
                 color: 'white',
                 weight: 2,
                 opacity: 1,
@@ -2037,7 +2016,7 @@ export class Visualization {
             // 终点标记（绿色圆点）
             const endMarker = L.circleMarker(endPoint, {
                 radius: 7.5,
-                fillColor: 'green',
+                fillColor: config.colors.trajectory.end,
                 color: 'white',
                 weight: 2,
                 opacity: 1,
@@ -2236,7 +2215,7 @@ export class Visualization {
 
         const points = sortedTrajectory.map(p => [p.lat, p.lng]);
         const trackLine = L.polyline(points, {
-            color: '#667eea',
+            color: config.colors.trajectory.line,
             weight: 4,
             opacity: 0.7,
             lineJoin: 'round'
@@ -2245,7 +2224,7 @@ export class Visualization {
         // 起点标记
         L.marker(points[0], {
             icon: L.divIcon({
-                html: '<div style="background-color: red; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                html: `<div style="background-color: ${config.colors.trajectory.start}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>`,
                 iconSize: [15, 15],
                 iconAnchor: [7.5, 7.5]
             })
@@ -2259,7 +2238,7 @@ export class Visualization {
         // 终点标记
         L.marker(points[points.length - 1], {
             icon: L.divIcon({
-                html: '<div style="background-color: green; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+                html: `<div style="background-color: ${config.colors.trajectory.end}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>`,
                 iconSize: [15, 15],
                 iconAnchor: [7.5, 7.5]
             })
@@ -2276,7 +2255,7 @@ export class Visualization {
             const periodText = group.timePeriods.map(p => p.start === p.end ? `${p.start}` : `${p.start} - ${p.end}`).join(', ');
             L.marker([group.lat, group.lng], {
                 icon: L.divIcon({
-                    html: `<div style="background-color: #667eea; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>`,
+                    html: `<div style="background-color: ${config.colors.trajectory.waypoint}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>`,
                     iconSize: [12, 12],
                     iconAnchor: [6, 6]
                 })

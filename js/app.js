@@ -1,5 +1,7 @@
 import { DataLoader } from './data-loader.js';
 import { Visualization } from './visualization.js';
+import { config } from './config.js';
+import { config } from './config.js';
 
 /**
  * 应用主程序 - 事件处理和界面控制
@@ -501,15 +503,8 @@ export class App {
         const maxCount = 10000;
         const normalized = Math.min(count / maxCount, 1); // 归一化到 0-1
 
-        // 使用与热力图完全相同的颜色值
-        // 热力图配置：0.0: 'blue', 0.5: 'cyan', 0.7: 'lime', 0.9: 'yellow', 1.0: 'red'
-        const colors = {
-            blue: '#0000ff',    // blue
-            cyan: '#00ffff',    // cyan
-            lime: '#00ff00',    // lime
-            yellow: '#ffff00',  // yellow
-            red: '#ff0000'      // red
-        };
+        // 使用统一的颜色配置
+        const colors = config.colors.heatmap;
 
         let color;
         if (normalized === 0) {

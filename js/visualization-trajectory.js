@@ -1,5 +1,6 @@
 import { Visualization } from './visualization.js';
 import { config } from './config.js';
+import { config } from './config.js';
 
 /**
  * 轨迹相关方法：挂载到 Visualization 原型上
@@ -122,7 +123,7 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
         
         // 使用标准 Leaflet 折线绘制轨迹
         L.polyline(points, {
-            color: '#667eea',
+            color: config.colors.trajectory.line,
             weight: 4,
             opacity: 0.7,
             lineCap: 'round',
@@ -133,7 +134,7 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
         // 起点标记（红色圆点）
         L.circleMarker(startPoint, {
             radius: 7.5,
-            fillColor: 'red',
+            fillColor: config.colors.trajectory.start,
             color: 'white',
             weight: 2,
             opacity: 1,
@@ -149,7 +150,7 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
         // 终点标记（绿色圆点）
         L.circleMarker(endPoint, {
             radius: 7.5,
-            fillColor: 'green',
+            fillColor: config.colors.trajectory.end,
             color: 'white',
             weight: 2,
             opacity: 1,
@@ -169,7 +170,7 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
             // 使用与独立轨迹视图类似的小圆点样式
             L.circleMarker([group.lat, group.lng], {
                 radius: 5,
-                fillColor: '#667eea',
+                fillColor: config.colors.trajectory.waypoint,
                 color: 'white',
                 weight: 2,
                 opacity: 1,
@@ -354,7 +355,7 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
         
         // 使用标准 Leaflet 折线绘制轨迹
         const polyline = L.polyline(points, {
-            color: '#667eea',
+            color: config.colors.trajectory.line,
             weight: 4,
             opacity: 0.7,
             lineCap: 'round',
@@ -366,7 +367,7 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
         // 起点标记（红色圆点）
         L.circleMarker(startPoint, {
             radius: 7.5,
-            fillColor: 'red',
+            fillColor: config.colors.trajectory.start,
             color: 'white',
             weight: 2,
             opacity: 1,
@@ -382,7 +383,7 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
         // 终点标记（绿色圆点）
         L.circleMarker(endPoint, {
             radius: 7.5,
-            fillColor: 'green',
+            fillColor: config.colors.trajectory.end,
             color: 'white',
             weight: 2,
             opacity: 1,
@@ -402,7 +403,7 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
             // 使用与独立轨迹视图类似的小圆点样式
             L.circleMarker([group.lat, group.lng], {
                 radius: 5,
-                fillColor: '#667eea',
+                fillColor: config.colors.trajectory.waypoint,
                 color: 'white',
                 weight: 2,
                 opacity: 1,
@@ -582,7 +583,7 @@ Visualization.prototype.drawTrajectory = function (trajectory, id1, id2) {
 
     const points = sortedTrajectory.map(p => [p.lat, p.lng]);
     const trackLine = L.polyline(points, {
-        color: '#667eea',
+        color: config.colors.trajectory.line,
         weight: 4,
         opacity: 0.7,
         lineJoin: 'round'
@@ -591,7 +592,7 @@ Visualization.prototype.drawTrajectory = function (trajectory, id1, id2) {
     // 起点标记
     L.marker(points[0], {
         icon: L.divIcon({
-            html: '<div style="background-color: red; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+            html: `<div style="background-color: ${config.colors.trajectory.start}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>`,
             iconSize: [15, 15],
             iconAnchor: [7.5, 7.5]
         })
@@ -605,7 +606,7 @@ Visualization.prototype.drawTrajectory = function (trajectory, id1, id2) {
     // 终点标记
     L.marker(points[points.length - 1], {
         icon: L.divIcon({
-            html: '<div style="background-color: green; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>',
+            html: `<div style="background-color: ${config.colors.trajectory.end}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>`,
             iconSize: [15, 15],
             iconAnchor: [7.5, 7.5]
         })
@@ -622,7 +623,7 @@ Visualization.prototype.drawTrajectory = function (trajectory, id1, id2) {
         const periodText = group.timePeriods.map(p => p.start === p.end ? `${p.start}` : `${p.start} - ${p.end}`).join(', ');
         L.marker([group.lat, group.lng], {
             icon: L.divIcon({
-                html: `<div style="background-color: #667eea; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>`,
+                html: `<div style="background-color: ${config.colors.trajectory.waypoint}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>`,
                 iconSize: [12, 12],
                 iconAnchor: [6, 6]
             })

@@ -99,6 +99,32 @@ export const config = {
         };
         
         return tileSources[tileSource] || tileSources.esri;
+    },
+    
+    // 统一的颜色配置
+    colors: {
+        // 接触点颜色
+        contact: {
+            direct: '#dc2626',      // 密接（红色，rose-600）
+            indirect: '#f59e0b',    // 次密接（黄色，amber-500）
+            directHover: '#ef4444', // 密接悬浮（rose-500）
+            indirectHover: '#fbbf24' // 次密接悬浮（amber-400）
+        },
+        // 轨迹颜色
+        trajectory: {
+            line: '#667eea',        // 轨迹线（紫色，indigo-500）
+            start: '#dc2626',       // 起点（红色，与密接一致）
+            end: '#10b981',         // 终点（绿色，emerald-500）
+            waypoint: '#667eea'     // 中间点（与轨迹线一致）
+        },
+        // 热力图颜色（与 app.js 保持一致）
+        heatmap: {
+            blue: '#0000ff',
+            cyan: '#00ffff',
+            lime: '#00ff00',
+            yellow: '#ffff00',
+            red: '#ff0000'
+        }
     }
 };
 
