@@ -20,7 +20,7 @@ export const config = {
         return '';
     },
     
-    // Bearer Token 配置（用于函数计算 HTTP 触发器认证）
+    // Bearer Token 配置
     get apiToken() {
         // 从 meta 标签读取 token（部署时由 GitHub Actions 自动更新）
         const tokenTag = document.querySelector('meta[name="api-token"]');

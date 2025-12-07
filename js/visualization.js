@@ -1,5 +1,5 @@
 /**
- * 可视化模块 - 集成Leaflet地图（优化大数据量处理）
+ * 可视化模块 - 集成Leaflet地图
  */
 import { config } from './config.js';
 
@@ -12,7 +12,7 @@ export class Visualization {
         this.map = null;          // 主地图实例（地图导览和密接对查询共享）
         this.trajectoryMap = null; // 轨迹视图地图实例
         this.markersLayer = null; // 标记图层
-        this.queryMarkersLayer = null; // 查询专用标记图层（与markersLayer分离，用于查询结果）
+        this.queryMarkersLayer = null; // 查询专用标记图层
         this.legendControl = null; // 图例控件
         this.queryLegendControl = null; // 查询地图图例控件
         this.displayMode = 'all'; // 显示模式: 'all' 全部, 'direct' 密接, 'indirect' 次密接
@@ -21,8 +21,8 @@ export class Visualization {
         this.currentSecondaryContacts = []; // 当前查询的次密接数据
         this.currentQueryUserId = null; // 当前查询的用户ID
         this.isAdjustingQueryMapView = false; // 标志：是否正在程序性调整查询地图视图
-        this.queryContactMarkers = []; // 保存查询结果地图上的密接接触点标记，用于在绘制轨迹时隐藏
-        this.mapContactMarkers = []; // 保存主地图上的密接接触点标记，用于在绘制轨迹时隐藏
+        this.queryContactMarkers = []; // 查询结果地图上的密接接触点标记
+        this.mapContactMarkers = []; // 主地图上的密接接触点标记
         this.visualizationMode = 'points'; // 可视化模式: 'points' 标记点, 'heatmap' 热力图
         this.heatmapLayer = null; // 热力图层
         this.queryHeatmapLayer = null; // 查询地图热力图层
@@ -41,25 +41,25 @@ export class Visualization {
         };
 
         this._syncSlider = null;
-        this.timestampIndex = new Map(); // 时间戳-数据索引映射（优化查询性能）
+        this.timestampIndex = new Map(); // 时间戳-数据索引映射
 
         // 时间轴节流控制
         this._sliderThrottleTimer = null;     // 定时器句柄
         this._sliderPendingTimestamp = null;  // 最近一次滑动对应的时间戳
-        this._lastRequestedTimestamp = null;  // 最近一次实际请求的时间戳，避免重复请求
+        this._lastRequestedTimestamp = null;  // 最近一次实际请求的时间戳
         
-        // 缩放优化：节流和防抖
+        // 缩放节流和防抖
         this._zoomRedrawTimer = null;         // 缩放重绘节流定时器
         this._zoomRedrawPending = false;      // 是否有待处理的缩放重绘
         this._isZooming = false;              // 是否正在缩放中
         
         // 新增密接追踪
-        this.previousTimestampContacts = new Set(); // 上一个时间戳的密接对集合（用于计算新增）
+        this.previousTimestampContacts = new Set(); // 上一个时间戳的密接对集合
         this.previousTimestamp = null; // 上一个时间戳
-        this.previousTimestampData = null; // 上一个时间戳的完整数据（用于查询比较）
+        this.previousTimestampData = null; // 上一个时间戳的完整数据
         this.newContactType = 'direct'; // 新增密接列表当前显示类型: 'direct' 密接, 'indirect' 次密接
-        this.allNewContacts = []; // 所有新增密接数据（包括直接和次密接）
-        this.dataCenter = null; // 数据边界中心点，用于定位按钮
+        this.allNewContacts = []; // 所有新增密接数据
+        this.dataCenter = null; // 数据边界中心点
     }
 
     /**
@@ -76,7 +76,6 @@ export class Visualization {
         // 从tileLayer配置中获取子域名列表，如果没有则使用默认值
         const subdomains = tileLayer.options.subdomains || ['a', 'b', 'c'];
         
-        // 确保subdomains是数组格式（Leaflet可能返回字符串）
         const subdomainArray = Array.isArray(subdomains) ? subdomains : subdomains.split('');
         
         // 获取当前URL使用的子域名
@@ -173,8 +172,6 @@ export class Visualization {
             maxZoom: 19, // 允许缩放到最大级别
             attributionControl: false // 不显示默认的版权标签
         }).setView([0, 0], 13);
-        // 保存背景图层引用，确保不会被误删
-        // 使用配置的瓦片源（默认高德地图，国内速度快）
         const tileConfig = config.tileConfig;
         this.baseTileLayer = L.tileLayer(tileConfig.url, {
             subdomains: tileConfig.subdomains,
@@ -200,7 +197,7 @@ export class Visualization {
             }, 100);
         });
         
-        // 可视化模式切换控件现在在HTML中，延迟初始化以确保DOM已加载
+        // 可视化模式切换控件现在在HTML中，延迟初始化
         setTimeout(() => {
             this.createVisualizationControl();
         }, 100);
@@ -248,7 +245,6 @@ export class Visualization {
      * @returns {Promise} 返回一个 Promise，当地图初始化完成时 resolve
      */
     initQueryMap() {
-        // 确保主地图已初始化
         if (!this.map) {
             this.initMap();
         }
@@ -552,7 +548,6 @@ export class Visualization {
 
     /**
      * 设置地图边界
-     * 不限制地图移动范围，允许加载边界外的瓦片，避免比例尺太大时边缘部分不加载
      */
     async setMapMaxBounds() {
         const bounds = await this.dataLoader.getBoundsInfo();
@@ -643,7 +638,6 @@ export class Visualization {
                     const targetTs = this._sliderPendingTimestamp;
                     this._sliderPendingTimestamp = null;
 
-                    // 再次检查，避免无效调用
                     if (targetTs != null && targetTs !== this._lastRequestedTimestamp) {
                         this._lastRequestedTimestamp = targetTs;
                         await this.setTimestamp(targetTs);
@@ -666,8 +660,6 @@ export class Visualization {
 
     /**
      * 设置当前时间戳并更新地图
-     * 注意：不再 await 后端请求，避免阻塞滑动体验。
-     * 数据返回后仅在时间戳仍是当前值时才绘制，防止绘制过期帧。
      */
     async setTimestamp(timestamp) {
         if (!this.dataLoader.allTimestamps.includes(timestamp)) return;
@@ -711,7 +703,7 @@ export class Visualization {
                 }
             }
             
-            // 预加载下一个时间戳的数据，避免网络卡顿
+            // 预加载下一个时间戳的数据
             const currentIndex = this.dataLoader.allTimestamps.indexOf(timestamp);
             if (currentIndex >= 0 && currentIndex < this.dataLoader.allTimestamps.length - 1) {
                 const nextTimestamp = this.dataLoader.allTimestamps[currentIndex + 1];
@@ -858,7 +850,7 @@ export class Visualization {
             this.heatmapLayer = null;
         }
         
-        // 确保地图导览的图例显示（如果不存在则创建）
+        // 显示地图导览的图例
         if (!this.legendControl) {
             this.createLegend();
         } else if (this.legendControl._map !== this.map) {
@@ -940,7 +932,6 @@ export class Visualization {
                 '可视化方式': '点密度（每个密接次数=1个点，强度=1）'
             });
             
-            // 确保地图已经准备好并且有有效的尺寸
             const addHeatmapLayer = () => {
                 // 检查地图尺寸
                 const mapSize = this.map.getSize();
@@ -975,7 +966,6 @@ export class Visualization {
                 }).addTo(this.map);
             };
             
-            // 使用 whenReady 确保地图已初始化
             if (this.map._loaded) {
                 addHeatmapLayer();
             } else {
@@ -994,7 +984,7 @@ export class Visualization {
         // 清除之前的标记引用和图层
         this.mapContactMarkers = [];
         
-        // 获取地图边界，只渲染可见区域内的点（优化性能）
+        // 获取地图边界，只渲染可见区域内的点
         const bounds = this.map.getBounds();
         const visiblePoints = [];
         const popupData = new Map(); // 存储弹出框数据
@@ -1039,16 +1029,12 @@ export class Visualization {
             }
         });
         
-        // 使用与地图“绑定”的 Leaflet 标记点来渲染（替代 Canvas 覆盖层，保证与地图完全同步）
-        // 在“屏幕中大小基本不变”的基础上，加一个随 zoom 线性变化的轻微补偿：
-        // - 地图放大时，点半径略微变大（线性关系），避免肉眼感觉点明显变小
-        // - 地图缩小时，点半径略微变小，但做下限保护，避免缩得过小
+        // 使用与地图绑定的 Leaflet 标记点来渲染
+        // 点大小随 zoom 线性变化
         const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
         const baseZoom = 13;
         const zoomDelta = zoom - baseZoom;
-        // 线性补偿因子：每放大 1 级，半径增加 25%；每缩小 1 级，半径减小 25%
         let zoomFactor = 1 + 0.25 * zoomDelta;
-        // 下限保护，避免缩得太小
         if (zoomFactor < 1) zoomFactor = 1;
 
         visiblePoints.forEach(point => {
@@ -1058,7 +1044,7 @@ export class Visualization {
             const minCount = 1;
             const maxCount = 200;
             const safeCount = Math.max(point.count, minCount);
-            const logCount = Math.log(1 + safeCount);       // ln(1 + count)，避免 count=0 问题
+            const logCount = Math.log(1 + safeCount);
             const logMax = Math.log(1 + maxCount);
             const baseRadius = minRadius + (maxRadius - minRadius) * (logCount / logMax);
             const radius = baseRadius * zoomFactor;
@@ -1159,10 +1145,8 @@ export class Visualization {
      * 绘制查询结果地图
      */
     async drawQueryResultsMap(userId, directContacts, secondaryContacts) {
-        // 确保查询地图已初始化（等待初始化完成）
         await this.initQueryMap();
 
-        // 再次检查地图和标记图层是否存在
         if (!this.map || !this.queryMarkersLayer) {
             console.error('查询地图初始化失败，无法绘制查询结果');
             return;
@@ -1201,24 +1185,22 @@ export class Visualization {
                 }
             });
             
-            // 确保背景图层存在（如果被误删，重新添加）
+            // 恢复背景图层
             if (this.baseTileLayer && !this.map.hasLayer(this.baseTileLayer)) {
                 this.baseTileLayer.addTo(this.map);
             }
             
-            // 强制刷新背景图层，确保瓦片加载
             if (this.baseTileLayer) {
                 this.baseTileLayer.redraw();
             }
             
-            // 确保查询图例显示（如果不存在则创建）
+            // 显示查询图例
             if (!this.queryLegendControl) {
                 this.createQueryMapLegend();
             } else if (this.queryLegendControl._map !== this.map) {
                 this.map.addControl(this.queryLegendControl);
             }
             
-            // 再次刷新地图大小，确保容器尺寸正确
             setTimeout(() => {
                 if (this.map) {
                     this.map.invalidateSize();
@@ -1317,16 +1299,13 @@ export class Visualization {
                 
                 marker.bindPopup(popupContent);
                 
-                // 保存标记引用，用于在绘制轨迹时隐藏
                 this.queryContactMarkers.push(marker);
             });
 
             if (mapPoints.length > 0) {
                 const bounds = L.latLngBounds(mapPoints);
-                // 设置标志，避免 fitBounds 触发缩放事件导致的重绘
                 this.isAdjustingQueryMapView = true;
                 this.map.fitBounds(bounds, { padding: [50, 50] });
-                // 使用 setTimeout 确保 fitBounds 完成后再重置标志
                 setTimeout(() => {
                     this.isAdjustingQueryMapView = false;
                 }, 300);
@@ -1387,7 +1366,7 @@ export class Visualization {
         this.currentSecondaryContacts = secondaryContacts;
         this.queryContactType = 'direct'; // 默认显示密接
 
-        // 绘制地图（异步，不等待完成，避免阻塞 UI）
+        // 绘制地图
         this.drawQueryResultsMap(userId, directContacts, secondaryContacts).catch(err => {
             console.error('绘制查询结果地图失败:', err);
         });
@@ -1464,7 +1443,6 @@ export class Visualization {
                 directBtn.className = `${baseClasses} border-r border-slate-200 bg-white hover:bg-slate-50 text-slate-700`;
             }
             
-            // 确保 data-type 属性存在
             directBtn.setAttribute('data-type', 'direct');
             indirectBtn.setAttribute('data-type', 'indirect');
         }
@@ -1859,26 +1837,25 @@ export class Visualization {
                 directBtn.className = `${baseClasses} border-r border-slate-200 bg-white hover:bg-slate-50 text-slate-700`;
             }
             
-            // 确保 data-type 属性存在
             directBtn.setAttribute('data-type', 'direct');
             indirectBtn.setAttribute('data-type', 'indirect');
         }
     }
 
     /**
-     * 在主地图上绘制轨迹（用于总览视图）
+     * 在主地图上绘制轨迹
      */
     drawMapTrajectory(trajectory, id1, id2) {
         if (!this.map) return;
 
         setTimeout(() => {
-            // 隐藏热力图图层，避免遮挡轨迹
+            // 隐藏热力图图层
             if (this.heatmapLayer) {
                 this.map.removeLayer(this.heatmapLayer);
                 this.heatmapLayer = null;
             }
             
-            // 隐藏密接接触点标记（而不是删除），避免遮挡轨迹
+            // 隐藏密接接触点标记
             this.mapContactMarkers.forEach(marker => {
                 if (marker && marker._map) {
                     if (typeof marker.setOpacity === 'function') {
@@ -1890,8 +1867,6 @@ export class Visualization {
             });
             
             // 清除现有轨迹标记和线条
-            // 先收集所有需要删除的轨迹图层（避免遍历时修改集合的问题）
-            // 注意：只删除轨迹相关的图层，不删除背景图层和标记图层
             const layersToRemove = [];
             this.map.eachLayer(layer => {
                 // 只删除轨迹线条和轨迹标记，不删除背景图层、标记图层等
@@ -1905,10 +1880,8 @@ export class Visualization {
                 this.map.removeLayer(layer);
             });
             
-            // 确保背景图层存在（如果被误删，重新添加）
+            // 恢复背景图层
             if (!this.baseTileLayer) {
-                // 如果背景图层不存在，重新创建
-                // 使用配置的瓦片源
                 const tileConfig = config.tileConfig;
                 this.baseTileLayer = L.tileLayer(tileConfig.url, {
                     subdomains: tileConfig.subdomains,
@@ -1922,10 +1895,8 @@ export class Visualization {
                 this.baseTileLayer.addTo(this.map);
             }
             
-            // 确保地图容器大小正确
             this.map.invalidateSize();
             
-            // 强制刷新背景图层，确保瓦片加载
             if (this.baseTileLayer) {
                 this.baseTileLayer.redraw();
             }
@@ -1999,8 +1970,7 @@ export class Visualization {
                 isTrajectoryPolyline: true
             }).addTo(this.map);
             
-            // 添加标记用于点击检测和弹出框
-            // 起点标记（红色圆点）
+            // 起点标记
             const startMarker = L.circleMarker(startPoint, {
                 radius: 7.5,
                 fillColor: config.colors.trajectory.start,
@@ -2054,35 +2024,26 @@ export class Visualization {
             // 计算边界并调整视图
             const bounds = L.latLngBounds(points);
             
-            // 先确保地图容器大小正确
             this.map.invalidateSize();
             
-            // 等待地图容器大小更新后再调整视图
             setTimeout(() => {
-                // 再次确保地图大小正确
                 this.map.invalidateSize();
                 
-                // 先设置视图到边界中心，确保地图先定位到大致位置
                 const center = bounds.getCenter();
                 this.map.setView(center, this.map.getZoom(), { animate: false });
                 
-                // 等待地图视图稳定
                 setTimeout(() => {
-                    // 调整视图到轨迹边界
                     this.map.fitBounds(bounds, { 
                         padding: [50, 50],
                         animate: false,
                         maxZoom: 18
                     });
                     
-                    // 等待地图视图调整完成后再刷新瓦片
                     setTimeout(() => {
-                        // 强制刷新瓦片图层，确保所有瓦片都加载
                         if (this.baseTileLayer) {
                             this.baseTileLayer.redraw();
                         }
                         
-                        // 再次调用 invalidateSize 确保地图正确渲染
                         this.map.invalidateSize();
                     }, 300);
                 }, 200);
@@ -2198,7 +2159,6 @@ export class Visualization {
 
         // 时间段合并
         Object.values(locationGroups).forEach(group => {
-            // 先对时间戳去重，避免重复的时间戳导致重复的时间段
             group.timestamps = [...new Set(group.timestamps)].sort((a, b) => a - b);
             group.timePeriods = [];
             if (group.timestamps.length === 0) return;

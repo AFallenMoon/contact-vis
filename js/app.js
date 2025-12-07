@@ -35,7 +35,6 @@ export class App {
             // 初始化事件监听
             this.setupEventListeners();
             
-            // 确保导航按钮的初始状态正确（包括 hover 类）
             this.switchView('map-view');
 
             // 只有当有数据时才初始化动画
@@ -43,7 +42,6 @@ export class App {
                 this.visualization.initMapAnimation();
                 this.visualization.drawMapAtTimestamp(this.visualization.mapAnimation.currentTimestamp);
                 
-                // 更新统计信息（在元素存在时才更新，避免空节点导致报错）
                 const totalEl = document.getElementById('total-contacts');
                 if (totalEl) {
                     const count = this.dataLoader.contacts.length;
@@ -208,7 +206,6 @@ export class App {
                 btn.className = `nav-btn ${baseClasses} bg-white text-slate-700 border border-slate-200 hover:bg-slate-50`;
             }
             
-            // 确保 data-view 属性存在
             btn.setAttribute('data-view', dataView);
         });
 
@@ -223,7 +220,7 @@ export class App {
             }
         });
         
-        // 移动共享的地图容器到当前视图（不重新初始化，避免闪烁）
+        // 移动共享的地图容器到当前视图
         if ((viewName === 'map-view' || viewName === 'query-view') && this.visualization) {
             const mapContainer = document.getElementById('map-container');
             const targetWrapperId = viewName === 'map-view' ? 'map-container-wrapper-map' : 'map-container-wrapper-query';
@@ -242,7 +239,6 @@ export class App {
                 if (!this.visualization.map) {
                     this.visualization.initMap();
                 } else {
-                    // 地图已存在，只需要刷新大小（延迟以确保DOM已更新）
                     setTimeout(() => {
                         if (this.visualization.map) {
                             this.visualization.map.invalidateSize();
@@ -254,7 +250,6 @@ export class App {
 
         this.currentView = viewName;
 
-        // 当切换到查询视图时，确保查询标记图层已初始化
         if (viewName === 'query-view') {
             // 隐藏地图导览的热力图层，显示查询图层
             if (this.visualization.heatmapLayer && this.visualization.map && this.visualization.map.hasLayer(this.visualization.heatmapLayer)) {
@@ -267,16 +262,14 @@ export class App {
                 this.visualization.map.removeControl(this.visualization.legendControl);
             }
             
-            // 确保背景图层存在
+            // 恢复背景图层
             if (this.visualization.map && this.visualization.baseTileLayer && !this.visualization.map.hasLayer(this.visualization.baseTileLayer)) {
                 this.visualization.baseTileLayer.addTo(this.visualization.map);
             }
             
             this.visualization.initQueryMap();
-            // 初始化切换按钮，确保即使没有数据时也能切换
             this.visualization.initContactTypeButtons();
             
-            // 仅刷新地图大小，避免重新绘制或强制重载瓦片，减少闪烁
             setTimeout(() => {
                 if (this.visualization.map) {
                     this.visualization.map.invalidateSize();
@@ -325,7 +318,6 @@ export class App {
         // 渲染结果
         this.visualization.renderQueryResults(userId, contacts, secondaryContacts);
 
-        // 确保显示结果列表视图
         this.backToQueryResults();
 
         if (!document.getElementById('query-view').classList.contains('active')) {
@@ -342,7 +334,6 @@ export class App {
             return;
         }
         
-        // 确保在查询视图中
         if (this.currentView !== 'query-view') {
             this.switchView('query-view');
         }
@@ -397,7 +388,7 @@ export class App {
             layersToRemove.forEach(layer => this.visualization.map.removeLayer(layer));
         }
 
-        // 同时清除查询图层中用于轨迹的标记（queryMarkersLayer 内部的起点 / 终点 / 中途点）
+        // 清除查询图层中的轨迹标记
         if (this.visualization.queryMarkersLayer) {
             const toRemove = [];
             this.visualization.queryMarkersLayer.eachLayer(layer => {
@@ -418,7 +409,6 @@ export class App {
             return;
         }
         
-        // 确保在总览视图中
         if (this.currentView !== 'map-view') {
             this.switchView('map-view');
         }
@@ -437,9 +427,7 @@ export class App {
         // 获取轨迹数据
         const trajectory = await this.dataLoader.getContactTrajectory(id1, id2);
         
-        // 等待视图切换完成，确保地图容器可见
         setTimeout(() => {
-            // 确保地图容器大小正确
             if (this.visualization.map) {
                 this.visualization.map.invalidateSize();
             }

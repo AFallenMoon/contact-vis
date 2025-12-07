@@ -1,7 +1,6 @@
 /**
  * 缓存管理器
- * 使用内存缓存（Map）实现缓存，减少后端 API 调用
- * 注意：内存缓存在页面刷新后会丢失，不会持久化存储
+ * 使用内存缓存（Map）实现缓存
  */
 class CacheManager {
     constructor() {
@@ -149,7 +148,7 @@ export const cacheManager = new CacheManager();
 if (typeof window !== 'undefined') {
     cacheManager.clearOldCache();
     
-    // 页面卸载时清理所有缓存（可选，确保不持久化）
+    // 页面卸载时清理所有缓存
     window.addEventListener('beforeunload', () => {
         cacheManager.clearAll();
     });

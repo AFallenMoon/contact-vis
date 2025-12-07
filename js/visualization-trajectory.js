@@ -27,7 +27,6 @@ function buildTrajectoryData(trajectory) {
 
     // 时间段合并
     Object.values(locationGroups).forEach(group => {
-        // 先对时间戳去重，避免重复的时间戳导致重复的时间段
         group.timestamps = [...new Set(group.timestamps)].sort((a, b) => a - b);
         group.timePeriods = [];
         if (group.timestamps.length === 0) return;
@@ -56,16 +55,13 @@ function buildTrajectoryData(trajectory) {
  * 在查询视图中绘制轨迹
  */
 Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, id2) {
-    // 确保查询地图已初始化（等待初始化完成）
     await this.initQueryMap();
 
-    // 再次检查地图和标记图层是否存在
     if (!this.map || !this.queryMarkersLayer) {
         console.error('查询地图初始化失败，无法绘制轨迹');
         return;
     }
 
-    // 使用 setTimeout 确保 DOM 已更新
     setTimeout(() => {
         if (!this.map || !this.queryMarkersLayer) {
             console.error('查询地图或标记图层不存在');
@@ -78,7 +74,7 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
             this.queryTrajectoryCanvasLayer = null;
         }
         
-        // 清除现有轨迹标记和线条（用于点击检测的透明标记 + 折线）
+        // 清除现有轨迹标记和线条
         const layersToRemove = [];
         this.map.eachLayer(layer => {
             if (
@@ -92,7 +88,7 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
             this.map.removeLayer(layer);
         });
         
-        // 确保背景图层存在（如果被误删，重新添加）
+        // 恢复背景图层
         if (this.baseTileLayer && !this.map.hasLayer(this.baseTileLayer)) {
             this.baseTileLayer.addTo(this.map);
         }
@@ -183,24 +179,18 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
 
         // 计算边界并调整视图
         const bounds = L.latLngBounds(points);
-        // 设置标志，避免 fitBounds 触发缩放事件导致的重绘
         this.isAdjustingQueryMapView = true;
         
-        // 确保地图容器大小正确
         this.map.invalidateSize();
         
-        // 等待地图大小更新后再调整视图
         setTimeout(() => {
             this.map.fitBounds(bounds, { padding: [50, 50] });
             
-            // 等待地图视图调整和瓦片加载完成
             const onMapReady = () => {
-                // 强制刷新瓦片图层，确保所有瓦片都加载
                 if (this.baseTileLayer) {
                     this.baseTileLayer.redraw();
                 }
                 
-                // 再次调用 invalidateSize 确保地图正确渲染
                 this.map.invalidateSize();
                 
                 // 重置标志
@@ -282,16 +272,14 @@ Visualization.prototype.drawQueryTrajectory = async function (trajectory, id1, i
 Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
     if (!this.map) return;
 
-    setTimeout(() => {
-        // 隐藏热力图图层，避免遮挡轨迹
-        if (this.heatmapLayer) {
+        setTimeout(() => {
+            // 隐藏热力图图层
+            if (this.heatmapLayer) {
             this.map.removeLayer(this.heatmapLayer);
             this.heatmapLayer = null;
         }
         
         // 清除现有轨迹标记和线条
-        // 先收集所有需要删除的轨迹图层（避免遍历时修改集合的问题）
-        // 注意：只删除轨迹相关的图层，不删除背景图层和标记图层
         const layersToRemove = [];
         this.map.eachLayer(layer => {
             // 只删除轨迹线条和轨迹标记，不删除背景图层、标记图层等
@@ -305,10 +293,8 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
             this.map.removeLayer(layer);
         });
         
-        // 确保背景图层存在（如果被误删，重新添加）
+        // 恢复背景图层
         if (!this.baseTileLayer) {
-            // 如果背景图层不存在，重新创建
-            // 使用配置的瓦片源
             const tileConfig = config.tileConfig;
             this.baseTileLayer = L.tileLayer(tileConfig.url, {
                 subdomains: tileConfig.subdomains,
@@ -322,10 +308,8 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
             this.baseTileLayer.addTo(this.map);
         }
         
-        // 确保地图容器大小正确
         this.map.invalidateSize();
         
-        // 强制刷新背景图层，确保瓦片加载
         if (this.baseTileLayer) {
             this.baseTileLayer.redraw();
         }
@@ -361,8 +345,7 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
             isTrajectoryPolyline: true
         }).addTo(this.map);
         
-        // 添加标记用于点击检测和弹出框
-        // 起点标记（红色圆点）
+        // 起点标记
         L.circleMarker(startPoint, {
             radius: 7.5,
             fillColor: config.colors.trajectory.start,
@@ -417,35 +400,26 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
         // 计算边界并调整视图
         const bounds = L.latLngBounds(points);
         
-        // 先确保地图容器大小正确
         this.map.invalidateSize();
         
-        // 等待地图容器大小更新后再调整视图
         setTimeout(() => {
-            // 再次确保地图大小正确
             this.map.invalidateSize();
             
-            // 先设置视图到边界中心，确保地图先定位到大致位置
             const center = bounds.getCenter();
             this.map.setView(center, this.map.getZoom(), { animate: false });
             
-            // 等待地图视图稳定
             setTimeout(() => {
-                // 调整视图到轨迹边界
                 this.map.fitBounds(bounds, { 
                     padding: [50, 50],
                     animate: false,
                     maxZoom: 18
                 });
                 
-                // 等待地图视图调整完成后再刷新瓦片
                 setTimeout(() => {
-                    // 强制刷新瓦片图层，确保所有瓦片都加载
                     if (this.baseTileLayer) {
                         this.baseTileLayer.redraw();
                     }
                     
-                    // 再次调用 invalidateSize 确保地图正确渲染
                     this.map.invalidateSize();
                 }, 300);
             }, 200);
@@ -561,7 +535,6 @@ Visualization.prototype.drawTrajectory = function (trajectory, id1, id2) {
 
     // 时间段合并
     Object.values(locationGroups).forEach(group => {
-        // 先对时间戳去重，避免重复的时间戳导致重复的时间段
         group.timestamps = [...new Set(group.timestamps)].sort((a, b) => a - b);
         group.timePeriods = [];
         if (group.timestamps.length === 0) return;

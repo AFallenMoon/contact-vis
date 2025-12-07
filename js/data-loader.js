@@ -67,7 +67,7 @@ export class DataLoader {
             
             console.log(`初始化完成：第一个时间戳 ${firstTimestamp}，包含 ${this.contacts.length} 条记录`);
             
-            // 预加载第二个时间戳的数据（如果存在），避免网络卡顿
+            // 预加载第二个时间戳的数据
             if (this.allTimestamps.length > 1) {
                 const secondTimestamp = this.allTimestamps[1];
                 this.preloadDataByTimestamp(secondTimestamp).catch(err => {
@@ -447,7 +447,7 @@ export class DataLoader {
      * 从后端API获取两个用户间的所有接触点轨迹
      */
     async getContactTrajectory(id1, id2) {
-            // 规范化参数顺序，保证与后端缓存键一致，并避免(id1,id2)顺序导致的问题
+            // 规范化参数顺序
             const a = Math.min(id1, id2);
             const b = Math.max(id1, id2);
         const cacheKey = `${a}_${b}`;
