@@ -1,0 +1,88 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Update API Configuration
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          # 检查必需的 secrets 是否存在
+          if [ -z "$API_BASE_URL" ]; then
+            echo "❌ Error: API_BASE_URL secret is not set"
+            echo "   Please configure API_BASE_URL in GitHub Secrets"
+            exit 1
+          fi
+          
+          # 替换 API Base URL
+          sed -i "s|__API_BASE_URL__|$API_BASE_URL|g" index.html
+          
+          # 如果提供了 Token，则替换 Token 配置（Bearer 认证）
+          if [ -n "$API_TOKEN" ]; then
+            # 替换 Token 配置
+            sed -i "s|__API_TOKEN__|$API_TOKEN|g" index.html
+            
+            echo "✅ API configuration updated (Bearer Token authentication)"
+          else
+            # 如果没有 Token，使用空值（匿名访问）
+            sed -i "s|__API_TOKEN__||g" index.html
+            
+            echo "✅ API configuration updated (Anonymous access)"
+          fi
+          
+          # 验证替换是否成功（不输出敏感信息）
+          if grep -q "__API_BASE_URL__" index.html; then
+            echo "❌ Error: Failed to replace API_BASE_URL placeholder"
+            exit 1
+          fi
+          
+          echo "   API Base URL: ${API_BASE_URL%%/*}..." # 只显示协议部分
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+          exclude: |
+            api/
+            .github/
+            *.md
+            *.toml
+            *.yaml
+            *.json
+            !package.json
+            requirements.txt
+            Procfile
+            .gitignore
+            .vscode/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
