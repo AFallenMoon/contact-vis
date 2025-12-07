@@ -1,5 +1,4 @@
-import { Visualization } from './visualization.js';
-import { config } from './config.js';
+import { Visualization, config } from './visualization.js';
 
 /**
  * 轨迹相关方法：挂载到 Visualization 原型上

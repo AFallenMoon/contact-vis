@@ -3,6 +3,9 @@
  */
 import { config } from './config.js';
 
+// 重新导出 config，供其他模块使用
+export { config };
+
 export class Visualization {
     constructor(dataLoader) {
         this.dataLoader = dataLoader;
