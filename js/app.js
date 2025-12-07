@@ -1,6 +1,7 @@
 import { DataLoader } from './data-loader.js';
 import { Visualization } from './visualization.js';
 import { config } from './config.js';
+import './visualization-trajectory.js'; // 必须在 Visualization 导入后加载，用于扩展原型
 
 /**
  * 应用主程序 - 事件处理和界面控制

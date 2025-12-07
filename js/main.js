@@ -1,5 +1,4 @@
 import { App } from './app.js';
-import './visualization-trajectory.js';
 
 // 初始化应用入口
 document.addEventListener('DOMContentLoaded', () => {
