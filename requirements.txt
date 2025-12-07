@@ -1,0 +1,6 @@
+Flask
+flask-cors
+flask-caching
+flask-compress
+pyarrow
+pandas

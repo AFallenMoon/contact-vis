@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>传染病密接轨迹可视化系统</title>
+    <!-- 引入Tailwind（用于整体布局与样式） -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Leaflet资源 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+ <body class="bg-white text-slate-900">
+    <div class="h-screen flex flex-col gap-4 overflow-hidden">
+         <!-- 顶部导航 -->
+         <header class="header px-3 md:px-6 py-4 bg-slate-50 border-b border-slate-200">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <!-- 左侧：标题与副标题 -->
+                <div class="flex items-start gap-3">
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-semibold text-slate-800">
+                            传染病密接轨迹可视化系统
+                        </h1>
+                        <p class="mt-1 text-sm text-slate-500">
+                            当前城市：芝加哥 &ensp;|&ensp; 数据规模：1,000,000
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 右侧：视图切换 -->
+                <div class="nav-tabs flex flex-wrap justify-start md:justify-end gap-2">
+                    <button class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium border border-slate-900 bg-slate-900 hover:bg-slate-900 text-white transition" data-view="map-view">
+                        地图总览
+                    </button>
+                    <button class="nav-btn px-4 py-2 rounded-lg text-sm font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition" data-view="query-view">
+                        密接对查询
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 地图总览视图 -->
+        <div id="map-view" class="view-container block flex-1 min-h-0 flex flex-col">
+            <div class="view-content flex flex-col space-y-4 pb-4 px-3 md:px-6 flex-1 min-h-0">
+                <!-- 主内容区域：左 总览视图+新增密接列表，右 地图 -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch flex-1 min-h-0">
+                    <!-- 左：总览视图 + 新增密接列表 -->
+                    <div class="lg:col-span-2 flex flex-col space-y-3 min-h-0">
+                        <!-- 总览视图：统计信息 + 时间轴控制 + 地图 -->
+                        <section class="rounded-2xl bg-white border border-slate-200 px-6 py-3 shadow-sm space-y-3 flex-shrink-0">
+                            <!-- 行 1：标题 -->
+                            <div class="flex flex-col gap-1">
+                                <span class="text-sm font-medium tracking-wide text-slate-400 uppercase">总览视图</span>
+                                <h2 class="text-base md:text-lg font-semibold text-slate-800">实时城市密接分布</h2>
+                            </div>
+
+                            <!-- 行 2：总密接对数tag + 显示模式切换 -->
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3.5 py-1.5 border border-slate-200" style="min-width: 150px; height: 32px;">
+                                        <span id="total-contacts-dot" class="h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                                        <span class="text-xs text-slate-500 flex-shrink-0">密接对数</span>
+                                        <span id="total-contacts" class="text-sm font-semibold text-slate-900 flex-1 text-center"></span>
+                                    </div>
+                                    <!-- 可视化模式切换（胶囊按钮样式） -->
+                                    <div id="visualization-mode-control" class="flex border border-slate-200 rounded-full overflow-hidden bg-white" style="height: 32px;">
+                                        <button
+                                            id="viz-mode-canvas"
+                                            class="viz-mode-btn flex-1 px-3 text-xs font-medium border-r border-slate-200 bg-slate-900 hover:bg-slate-900 text-white transition h-full flex items-center justify-center"
+                                            data-mode="points"
+                                        >
+                                            标记点
+                                        </button>
+                                        <button
+                                            id="viz-mode-heatmap"
+                                            class="viz-mode-btn flex-1 px-3 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 transition h-full flex items-center justify-center"
+                                            data-mode="heatmap"
+                                        >
+                                            热力图
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 行 3：时间轴（独占一行） -->
+                            <div class="flex flex-col gap-2">
+                                <div class="flex items-center justify-between text-sm text-slate-500">
+                                    <span class="inline-flex items-center gap-2">
+                                        <span class="h-1 w-4 rounded-full bg-slate-300"></span>
+                                        <span>时间轴</span>
+                                    </span>
+                                    <span class="timestamp-label">
+                                        当前时间戳：
+                                        <span id="slider-value" class="font-semibold text-slate-900"></span>
+                                    </span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    id="timestamp-slider" 
+                                    min="0" 
+                                    max="100" 
+                                    value="0" 
+                                    class="w-full accent-slate-800 cursor-pointer"
+                                    title="拖拽查看不同时间戳的数据"
+                                >
+                                <!-- 播放控制按钮（SVG图标） -->
+                                <div class="flex items-center justify-center gap-4 mt-1">
+                                    <div class="flex items-center gap-4">
+                                        <button
+                                            id="first-btn"
+                                            class="p-2 hover:bg-slate-100 rounded transition"
+                                            aria-label="到最开始"
+                                            title="到最开始"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                                                <line x1="5" y1="19" x2="5" y2="5"></line>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            id="rewind-btn"
+                                            class="p-2 hover:bg-slate-100 rounded transition"
+                                            aria-label="快退 3 秒"
+                                            title="快退 3 秒"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polygon points="11 19 2 12 11 5 11 19"></polygon>
+                                                <polygon points="22 19 13 12 22 5 22 19"></polygon>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            id="play-btn"
+                                            class="p-2 hover:bg-slate-100 rounded transition"
+                                            aria-label="播放"
+                                            title="播放"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            id="pause-btn"
+                                            class="p-2 hover:bg-slate-100 rounded transition"
+                                            style="display:none;"
+                                            aria-label="暂停"
+                                            title="暂停"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <rect x="6" y="4" width="4" height="16"></rect>
+                                                <rect x="14" y="4" width="4" height="16"></rect>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            id="forward-btn"
+                                            class="p-2 hover:bg-slate-100 rounded transition"
+                                            aria-label="快进 3 秒"
+                                            title="快进 3 秒"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polygon points="13 19 22 12 13 5 13 19"></polygon>
+                                                <polygon points="2 19 11 12 2 5 2 19"></polygon>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            id="last-btn"
+                                            class="p-2 hover:bg-slate-100 rounded transition"
+                                            aria-label="到末尾"
+                                            title="到末尾"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                                                <line x1="19" y1="5" x2="19" y2="19"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <!-- 倍速切换按钮 -->
+                                    <button
+                                        id="playback-speed-btn"
+                                        class="playback-speed-option px-2 py-0.5 text-xs font-bold rounded-full border-2 border-slate-900 bg-white text-slate-900 transition hover:bg-slate-50"
+                                        style="min-width: 2.6rem;"
+                                        data-speed="1"
+                                        aria-label="播放倍速"
+                                        title="点击切换倍速（1x → 2x → 5x → 10x → 1x）"
+                                    >
+                                        1x
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 新增密接列表容器 -->
+                        <div id="new-contacts-container" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+                            <!-- 切换按钮 -->
+                            <div class="flex border-b border-slate-200 flex-shrink-0">
+                                <button
+                                    id="new-contact-type-direct-btn"
+                                    class="new-contact-type-btn active flex-1 py-3 text-sm font-medium border-r border-slate-200 bg-slate-900 hover:bg-slate-900 text-white transition"
+                                    data-type="direct"
+                                >
+                                    新增密接
+                                </button>
+                                <button
+                                    id="new-contact-type-indirect-btn"
+                                    class="new-contact-type-btn flex-1 py-3 text-sm font-medium bg-white hover:bg-slate-50 text-slate-700 transition"
+                                    data-type="indirect"
+                                >
+                                    新增次密接
+                                </button>
+                            </div>
+                            <!-- 列表内容 -->
+                            <div id="new-contacts-list" class="px-6 py-4 flex-1 overflow-y-auto">
+                                <div class="text-sm md:text-base text-slate-500 text-center py-8">
+                                    等待数据加载...
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 轨迹明细卡片容器（默认隐藏，与列表容器同级） -->
+                        <div id="new-contacts-trajectory-detail" class="hidden rounded-2xl border border-slate-200 bg-white shadow-sm px-6 py-3 flex-1 overflow-y-auto min-h-0">
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex flex-col gap-1">
+                                        <h2 class="text-base md:text-lg font-semibold text-slate-800">接触轨迹明细</h2>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        id="back-to-new-contacts-list-btn"
+                                        class="rounded-lg px-4 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                                    >
+                                        ← 返回列表
+                                    </button>
+                                </div>
+                                <div class="trajectory-ids flex flex-wrap items-center gap-4 text-sm text-slate-700">
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-slate-500">用户 1：</span>
+                                        <span
+                                            id="new-contacts-traj-user1"
+                                            class="font-mono text-slate-900 font-semibold"
+                                        ></span>
+                                    </span>
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-slate-500">用户 2：</span>
+                                        <span
+                                            id="new-contacts-traj-user2"
+                                            class="font-mono text-slate-900 font-semibold"
+                                        ></span>
+                                    </span>
+                                </div>
+                                <div id="new-contacts-trajectory-list" class="mt-3 flex-1 overflow-x-auto text-xs md:text-sm">
+                                    <!-- 轨迹列表将在此渲染 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右：地图（更宽，两个视图共享） -->
+                    <div class="lg:col-span-3 min-h-0 flex flex-col" id="map-container-wrapper-map">
+                        <div id="map-container" class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 w-full flex-1 min-h-0"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 密接对查询视图 -->
+        <div id="query-view" class="view-container hidden flex-1 min-h-0 flex flex-col">
+            <div class="view-content flex flex-col space-y-4 pb-4 px-3 md:px-6 flex-1 min-h-0">
+                <!-- 主内容区域：左 搜索+列表/轨迹明细，右 地图 -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch flex-1 min-h-0">
+                    <!-- 左：搜索框 + 结果列表或轨迹明细卡片 -->
+                    <div class="lg:col-span-2 flex flex-col space-y-3 min-h-0">
+                        <!-- 筛选搜索框 -->
+                        <section class="border border-slate-200 rounded-2xl bg-white shadow-sm px-6 py-3 space-y-3 flex-shrink-0">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-sm font-medium tracking-wide text-slate-400 uppercase">条件筛选</span>
+                                <h2 class="text-base md:text-lg font-semibold text-slate-800">按用户 ID 查询接触记录</h2>
+                            </div>
+                            <div class="flex flex-wrap gap-3 items-center">
+                                <input 
+                                    type="text" 
+                                    id="user-id-input" 
+                                    placeholder="输入用户 ID，例如 1001" 
+                                    class="flex-1 min-w-[9rem] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+                                >
+                                <button
+                                    id="query-btn"
+                                    class="rounded-lg px-4 py-2 text-sm bg-slate-900 hover:bg-slate-900 text-white font-medium"
+                                >
+                                    查询
+                                </button>
+                                <button
+                                    id="reset-btn"
+                                    class="rounded-lg px-4 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                                >
+                                    清空
+                                </button>
+                            </div>
+                        </section>
+
+                        <!-- 结果列表容器 -->
+                        <div id="query-results-container" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+                            <!-- 切换按钮 -->
+                            <div class="flex border-b border-slate-200 flex-shrink-0">
+                                <button
+                                    id="contact-type-direct-btn"
+                                    class="contact-type-btn active flex-1 py-3 text-sm font-medium border-r border-slate-200 bg-slate-900 hover:bg-slate-900 text-white transition"
+                                    data-type="direct"
+                                >
+                                    直接密接
+                                </button>
+                                <button
+                                    id="contact-type-indirect-btn"
+                                    class="contact-type-btn flex-1 py-3 text-sm font-medium bg-white hover:bg-slate-50 text-slate-700 transition"
+                                    data-type="indirect"
+                                >
+                                    次密接
+                                </button>
+                            </div>
+                            <!-- 列表内容 -->
+                            <div id="query-results" class="px-6 py-4 flex-1 overflow-y-auto">
+                                <div class="text-sm md:text-base text-slate-500 text-center py-8">
+                                    输入用户 ID 查询接触记录
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 轨迹明细卡片容器（默认隐藏） -->
+                        <div id="query-trajectory-detail" class="hidden rounded-2xl border border-slate-200 bg-white shadow-sm px-6 py-3 flex-1 overflow-y-auto min-h-0">
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex flex-col gap-1">
+                                        <h2 class="text-base md:text-lg font-semibold text-slate-800">接触轨迹明细</h2>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        id="back-to-results-btn"
+                                        class="rounded-lg px-4 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                                    >
+                                        ← 返回列表
+                                    </button>
+                                </div>
+                                <div class="trajectory-ids flex flex-wrap items-center gap-4 text-sm text-slate-700">
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-slate-500">用户 1：</span>
+                                        <span
+                                            id="query-traj-user1"
+                                            class="font-mono text-slate-900 font-semibold"
+                                        ></span>
+                                    </span>
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-slate-500">用户 2：</span>
+                                        <span
+                                            id="query-traj-user2"
+                                            class="font-mono text-slate-900 font-semibold"
+                                        ></span>
+                                    </span>
+                                </div>
+                                <div id="query-trajectory-list" class="mt-3 flex-1 overflow-x-auto text-xs md:text-sm">
+                                    <!-- 轨迹列表将在此渲染 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右：查询结果地图（更宽，共享map-container） -->
+                    <div class="lg:col-span-3 min-h-0 flex flex-col" id="map-container-wrapper-query">
+                        <!-- 地图容器将动态移动到这里 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 轨迹查询视图 -->
+        <div id="trajectory-view" class="view-container hidden">
+            <div class="view-content flex flex-col space-y-4 pb-4 px-3 md:px-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <!-- 左：轨迹列表信息 -->
+                    <div class="lg:col-span-1">
+                        <div class="trajectory-header border border-slate-200 rounded-2xl bg-white shadow-sm h-full flex flex-col">
+                            <div class="trajectory-panel px-6 py-3 space-y-3 flex flex-col h-full">
+                                <div class="flex items-center justify-between">
+                                    <h2 class="text-base md:text-lg font-semibold text-slate-800">接触轨迹明细</h2>
+                                    <button
+                                        type="button"
+                                        onclick="window.app && window.app.switchView('query-view')"
+                                        class="rounded-lg px-4 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                                    >
+                                        ← 返回查询结果
+                                    </button>
+                                </div>
+                                <div class="trajectory-ids flex flex-wrap items-center gap-4 text-sm text-slate-700">
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-slate-500">用户 1：</span>
+                                        <span
+                                            id="traj-user1"
+                                            class="font-mono text-slate-900 font-semibold"
+                                        ></span>
+                                    </span>
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-slate-500">用户 2：</span>
+                                        <span
+                                            id="traj-user2"
+                                            class="font-mono text-slate-900 font-semibold"
+                                        ></span>
+                                    </span>
+                                </div>
+                                <div id="trajectory-list" class="flex-1 overflow-x-auto text-xs md:text-sm">
+                                    <!-- 轨迹列表将在此渲染 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右：轨迹地图 -->
+                    <div class="lg:col-span-2">
+                        <div id="trajectory-map" class="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 w-full h-[500px]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
