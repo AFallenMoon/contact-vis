@@ -1,4 +1,5 @@
 import { Visualization } from './visualization.js';
+import { config } from './config.js';
 
 /**
  * 轨迹相关方法：挂载到 Visualization 原型上
@@ -308,9 +309,12 @@ Visualization.prototype.drawMapTrajectory = function (trajectory, id1, id2) {
         // 确保背景图层存在（如果被误删，重新添加）
         if (!this.baseTileLayer) {
             // 如果背景图层不存在，重新创建
-            // 使用OpenStreetMap
-            this.baseTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                subdomains: ['a', 'b', 'c']
+            // 使用配置的瓦片源
+            const tileConfig = config.tileConfig;
+            this.baseTileLayer = L.tileLayer(tileConfig.url, {
+                subdomains: tileConfig.subdomains,
+                maxZoom: tileConfig.maxZoom,
+                attribution: tileConfig.attribution
             }).addTo(this.map);
             
             // 启用瓦片检测和重试机制
@@ -509,9 +513,12 @@ Visualization.prototype.drawTrajectory = function (trajectory, id1, id2) {
             maxZoom: 19, // 允许缩放到最大级别
             attributionControl: false // 不显示默认的版权标签
         }).setView([0, 0], 13);
-        // 使用OpenStreetMap
-        const trajectoryTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            subdomains: ['a', 'b', 'c']
+        // 使用配置的瓦片源
+        const tileConfig = config.tileConfig;
+        const trajectoryTileLayer = L.tileLayer(tileConfig.url, {
+            subdomains: tileConfig.subdomains,
+            maxZoom: tileConfig.maxZoom,
+            attribution: tileConfig.attribution
         }).addTo(this.trajectoryMap);
         
         // 启用瓦片检测和重试机制

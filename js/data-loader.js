@@ -49,10 +49,10 @@ export class DataLoader {
             } else {
                 // 从 API 获取时间戳列表
                 const timestampsResponse = await this.apiFetch(`${this.apiBaseUrl}/api/timestamps`);
-                if (!timestampsResponse.ok) {
-                    throw new Error(`获取时间戳失败: ${timestampsResponse.status} ${timestampsResponse.statusText}`);
-                }
-                this.allTimestamps = await timestampsResponse.json();
+            if (!timestampsResponse.ok) {
+                throw new Error(`获取时间戳失败: ${timestampsResponse.status} ${timestampsResponse.statusText}`);
+            }
+            this.allTimestamps = await timestampsResponse.json();
                 // 缓存时间戳列表
                 cacheManager.set('timestamps', 'all', this.allTimestamps);
             }
@@ -447,9 +447,9 @@ export class DataLoader {
      * 从后端API获取两个用户间的所有接触点轨迹
      */
     async getContactTrajectory(id1, id2) {
-        // 规范化参数顺序，保证与后端缓存键一致，并避免(id1,id2)顺序导致的问题
-        const a = Math.min(id1, id2);
-        const b = Math.max(id1, id2);
+            // 规范化参数顺序，保证与后端缓存键一致，并避免(id1,id2)顺序导致的问题
+            const a = Math.min(id1, id2);
+            const b = Math.max(id1, id2);
         const cacheKey = `${a}_${b}`;
         
         // 检查缓存

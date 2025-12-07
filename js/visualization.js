@@ -1,6 +1,8 @@
 /**
  * 可视化模块 - 集成Leaflet地图（优化大数据量处理）
  */
+import { config } from './config.js';
+
 export class Visualization {
     constructor(dataLoader) {
         this.dataLoader = dataLoader;
@@ -169,13 +171,15 @@ export class Visualization {
             attributionControl: false // 不显示默认的版权标签
         }).setView([0, 0], 13);
         // 保存背景图层引用，确保不会被误删
-        // 使用OpenStreetMap
-        this.baseTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            subdomains: ['a', 'b', 'c'],
+        // 使用配置的瓦片源（默认高德地图，国内速度快）
+        const tileConfig = config.tileConfig;
+        this.baseTileLayer = L.tileLayer(tileConfig.url, {
+            subdomains: tileConfig.subdomains,
             keepBuffer: 5,  // 扩大缓冲区，预加载更多边界瓦片
             updateWhenZooming: false,  // 缩放时不更新，提升性能
             updateWhenIdle: true,  // 空闲时更新
-            maxZoom: 19
+            maxZoom: tileConfig.maxZoom,
+            attribution: tileConfig.attribution
         }).addTo(this.map);
         
         // 启用瓦片检测和重试机制
@@ -1922,9 +1926,12 @@ export class Visualization {
             // 确保背景图层存在（如果被误删，重新添加）
             if (!this.baseTileLayer) {
                 // 如果背景图层不存在，重新创建
-                // 使用OpenStreetMap
-                this.baseTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    subdomains: ['a', 'b', 'c']
+                // 使用配置的瓦片源
+                const tileConfig = config.tileConfig;
+                this.baseTileLayer = L.tileLayer(tileConfig.url, {
+                    subdomains: tileConfig.subdomains,
+                    maxZoom: tileConfig.maxZoom,
+                    attribution: tileConfig.attribution
                 }).addTo(this.map);
                 
                 // 启用瓦片检测和重试机制
@@ -2160,9 +2167,12 @@ export class Visualization {
                 maxZoom: 19, // 允许缩放到最大级别
                 attributionControl: false // 不显示默认的版权标签
             }).setView([0, 0], 13);
-            // 使用OpenStreetMap
-            const trajectoryTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                subdomains: ['a', 'b', 'c']
+            // 使用配置的瓦片源
+            const tileConfig = config.tileConfig;
+            const trajectoryTileLayer = L.tileLayer(tileConfig.url, {
+                subdomains: tileConfig.subdomains,
+                maxZoom: tileConfig.maxZoom,
+                attribution: tileConfig.attribution
             }).addTo(this.trajectoryMap);
             
             // 启用瓦片检测和重试机制
