@@ -285,11 +285,11 @@ export class Visualization {
                         <div class="flex flex-col gap-2">
                             <div class="flex items-center gap-2">
                                 <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white" style="background-color: ${config.colors.contact.direct};"></span>
-                                <span class="text-[10px] font-medium text-slate-700">只包含密接</span>
+                                <span class="text-[10px] font-medium text-slate-700">密接</span>
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white" style="background-color: ${config.colors.contact.indirect};"></span>
-                                <span class="text-[10px] font-medium text-slate-700">包含次密接</span>
+                                <span class="text-[10px] font-medium text-slate-700">密接 + 次密接</span>
                             </div>
                         </div>
                     </div>
@@ -817,7 +817,7 @@ export class Visualization {
 
 
     /**
-     * 在指定时间戳绘制地图（使用 Canvas 渲染优化性能）
+     * 在指定时间戳绘制地图
      */
     drawMapAtTimestamp(timestamp) {
         if (!this.map || !this.markersLayer) return;
@@ -972,13 +972,12 @@ export class Visualization {
                 this.map.whenReady(addHeatmapLayer);
             }
         } else {
-            // 使用 Canvas 渲染点（性能较好）
             this.drawPointsWithCanvas(pointGroups);
         }
     }
 
     /**
-     * 使用 Canvas 渲染点（真正的 Canvas 渲染，优化性能）
+     * 绘制点标记
      */
     drawPointsWithCanvas(pointGroups) {
         // 清除之前的标记引用和图层
@@ -1030,12 +1029,13 @@ export class Visualization {
         });
         
         // 使用与地图绑定的 Leaflet 标记点来渲染
-        // 点大小随 zoom 线性变化
+        // 点大小随 zoom 线性变化（更激进的变化）
         const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
         const baseZoom = 13;
         const zoomDelta = zoom - baseZoom;
-        let zoomFactor = 1 + 0.25 * zoomDelta;
-        if (zoomFactor < 1) zoomFactor = 1;
+        // 每级缩放变化50%，让点大小随缩放级别变化更明显
+        let zoomFactor = 1 + 0.5 * zoomDelta;
+        if (zoomFactor < 0.5) zoomFactor = 0.5; // 最小缩小到50%
 
         visiblePoints.forEach(point => {
             // 根据密接次数动态调整点的大小（整体放大：最小5px，最大10px），先按对数缩放，再乘以轻微的 zoom 线性补偿
@@ -1236,6 +1236,7 @@ export class Visualization {
             const mapPoints = [];
             const heatmapPoints = [];
             const popupData = new Map();
+            const markersData = [];
             
             groups.forEach((points, key) => {
                 const [lng, lat] = key.split('|').map(Number);
@@ -1247,7 +1248,6 @@ export class Visualization {
                 // 收集热力图数据
                 heatmapPoints.push([lat, lng, count]);
                 
-                // 收集 Canvas 渲染数据
                 // 两类：密接（只有direct）、次密接（有indirect，包括混合）
                 let color;
                 if (hasIndirect) {
@@ -1275,42 +1275,74 @@ export class Visualization {
                 }
                 popupData.set(`${lat}|${lng}`, popupContent);
                 
-                // 根据密接次数动态调整点的大小（最小6px，最大16px）
-                // 使用平方根缩放，降低面积膨胀速度
-                const minSize = 6;
-                const maxSize = 16; // 降低最大尺寸
-                const minCount = 1;
-                const maxCount = 200; // 提高最大计数假设值，让增长更慢
-                // 使用平方根缩放：sqrt(count)，比对数更慢
-                const sqrtCount = Math.sqrt(Math.max(count, minCount));
-                const sqrtMax = Math.sqrt(maxCount);
-                const size = minSize + (maxSize - minSize) * (sqrtCount / sqrtMax);
-                const anchor = size / 2;
-                
-                // 使用 Canvas 渲染（性能更好）
-                const marker = L.circleMarker([lat, lng], {
-                    radius: size / 2,
-                    fillColor: color,
-                    color: '#ffffff',
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.9
-                }).addTo(this.queryMarkersLayer);
-                
-                marker.bindPopup(popupContent);
-                
-                this.queryContactMarkers.push(marker);
+                // 保存标记数据，在 fitBounds 完成后再绘制
+                markersData.push({
+                    lat,
+                    lng,
+                    count,
+                    color,
+                    popupContent
+                });
             });
+
+            // 先调整地图视图，再绘制点（确保点大小基于正确的缩放级别）
+            const drawMarkers = () => {
+                // 计算缩放因子，与地图导览视图保持一致
+                const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
+                const baseZoom = 13;
+                const zoomDelta = zoom - baseZoom;
+                // 每级缩放变化50%，让点大小随缩放级别变化更明显
+                let zoomFactor = 1 + 0.5 * zoomDelta;
+                if (zoomFactor < 0.5) zoomFactor = 0.5; // 最小缩小到50%
+                
+                markersData.forEach(({ lat, lng, count, color, popupContent }) => {
+                    // 根据密接次数动态调整点的大小，与地图导览视图使用相同的逻辑
+                    const minRadius = 5;
+                    const maxRadius = 10;
+                    const minCount = 1;
+                    const maxCount = 200;
+                    const safeCount = Math.max(count, minCount);
+                    const logCount = Math.log(1 + safeCount);
+                    const logMax = Math.log(1 + maxCount);
+                    const baseRadius = minRadius + (maxRadius - minRadius) * (logCount / logMax);
+                    const radius = baseRadius * zoomFactor;
+                    
+                    const marker = L.circleMarker([lat, lng], {
+                        radius: radius,
+                        fillColor: color,
+                        color: '#ffffff',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).addTo(this.queryMarkersLayer);
+                    
+                    marker.bindPopup(popupContent);
+                    
+                    this.queryContactMarkers.push(marker);
+                });
+            };
 
             if (mapPoints.length > 0) {
                 const bounds = L.latLngBounds(mapPoints);
                 this.isAdjustingQueryMapView = true;
                 this.map.fitBounds(bounds, { padding: [50, 50] });
-                setTimeout(() => {
+                
+                // 等待 fitBounds 完成后再绘制点
+                this.map.once('moveend', () => {
+                    drawMarkers();
                     this.isAdjustingQueryMapView = false;
-                }, 300);
+                });
+                this.map.once('zoomend', () => {
+                    if (this.queryContactMarkers.length === 0) {
+                        drawMarkers();
+                    }
+                    this.isAdjustingQueryMapView = false;
+                });
             } else {
                 this.map.setView([39.9042, 116.4074], 12);
+                setTimeout(() => {
+                    drawMarkers();
+                }, 100);
             }
 
             this.map.invalidateSize();

@@ -273,6 +273,16 @@ export class App {
             setTimeout(() => {
                 if (this.visualization.map) {
                     this.visualization.map.invalidateSize();
+                    // 如果有查询结果，重新绘制以确保点大小正确
+                    if (this.currentQueryUserId && this.visualization.currentDirectContacts && this.visualization.currentSecondaryContacts) {
+                        this.visualization.drawQueryResultsMap(
+                            this.currentQueryUserId,
+                            this.visualization.currentDirectContacts,
+                            this.visualization.currentSecondaryContacts
+                        ).catch(err => {
+                            console.error('重新绘制查询结果失败:', err);
+                        });
+                    }
                 }
             }, 200);
         }
@@ -291,8 +301,16 @@ export class App {
             if (this.visualization.queryLegendControl && this.visualization.queryLegendControl._map === this.visualization.map) {
                 this.visualization.map.removeControl(this.visualization.queryLegendControl);
             }
-            // 不再在视图切换时强制重绘/重置地图，只保留一次性初始化逻辑
-            // 地图上的当前状态（缩放、中心、当前时间戳的点/轨迹）保持不变
+            
+            // 重新绘制地图导览视图，确保点大小基于正确的缩放级别
+            setTimeout(() => {
+                if (this.visualization.map && this.dataLoader.allTimestamps.length > 0) {
+                    this.visualization.map.invalidateSize();
+                    if (this.visualization.mapAnimation.currentTimestamp) {
+                        this.visualization.drawMapAtTimestamp(this.visualization.mapAnimation.currentTimestamp);
+                    }
+                }
+            }, 100);
         }
     }
 
