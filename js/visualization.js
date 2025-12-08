@@ -1029,13 +1029,13 @@ export class Visualization {
         });
         
         // 使用与地图绑定的 Leaflet 标记点来渲染
-        // 点大小随 zoom 线性变化（更激进的变化）
+        // 点大小随缩放级别变化，保持在地图上的实际面积不变
+        // Leaflet中，缩放级别每增加1，地图放大2倍
+        // 要保持实际面积不变，点的像素大小需要与缩放级别成反比：r(z) = r(baseZoom) * 2^(baseZoom - z)
         const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
         const baseZoom = 13;
-        const zoomDelta = zoom - baseZoom;
-        // 每级缩放变化50%，让点大小随缩放级别变化更明显
-        let zoomFactor = 1 + 0.5 * zoomDelta;
-        if (zoomFactor < 0.5) zoomFactor = 0.5; // 最小缩小到50%
+        const zoomDelta = baseZoom - zoom; // 注意：这里是 baseZoom - zoom，因为缩放级别越大，点应该越小
+        const zoomFactor = Math.pow(2, zoomDelta); // 2^(baseZoom - zoom)
 
         visiblePoints.forEach(point => {
             // 根据密接次数动态调整点的大小（整体放大：最小5px，最大10px），先按对数缩放，再乘以轻微的 zoom 线性补偿
@@ -1288,12 +1288,13 @@ export class Visualization {
             // 先调整地图视图，再绘制点（确保点大小基于正确的缩放级别）
             const drawMarkers = () => {
                 // 计算缩放因子，与地图导览视图保持一致
+                // 点大小随缩放级别变化，保持在地图上的实际面积不变
+                // Leaflet中，缩放级别每增加1，地图放大2倍
+                // 要保持实际面积不变，点的像素大小需要与缩放级别成反比：r(z) = r(baseZoom) * 2^(baseZoom - z)
                 const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
                 const baseZoom = 13;
-                const zoomDelta = zoom - baseZoom;
-                // 每级缩放变化50%，让点大小随缩放级别变化更明显
-                let zoomFactor = 1 + 0.5 * zoomDelta;
-                if (zoomFactor < 0.5) zoomFactor = 0.5; // 最小缩小到50%
+                const zoomDelta = baseZoom - zoom; // 注意：这里是 baseZoom - zoom，因为缩放级别越大，点应该越小
+                const zoomFactor = Math.pow(2, zoomDelta); // 2^(baseZoom - zoom)
                 
                 markersData.forEach(({ lat, lng, count, color, popupContent }) => {
                     // 根据密接次数动态调整点的大小，与地图导览视图使用相同的逻辑
