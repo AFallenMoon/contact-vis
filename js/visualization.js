@@ -236,7 +236,10 @@ export class Visualization {
                     }
                 });
             }
-            // 热力图会自动适应缩放级别，不需要重新绘制
+            // 缩放结束后重新绘制点，确保点大小基于正确的缩放级别
+            if (this.mapAnimation.currentTimestamp) {
+                this.drawMapAtTimestamp(this.mapAnimation.currentTimestamp);
+            }
         });
     }
 
@@ -1034,8 +1037,8 @@ export class Visualization {
         // 要保持实际面积不变，点的像素大小需要与缩放级别成反比：r(z) = r(baseZoom) * 2^(baseZoom - z)
         const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
         const baseZoom = 13;
-        const zoomDelta = baseZoom - zoom; // 注意：这里是 baseZoom - zoom，因为缩放级别越大，点应该越小
-        const zoomFactor = Math.pow(2, zoomDelta); // 2^(baseZoom - zoom)
+        const zoomDelta = baseZoom - zoom;
+        const zoomFactor = Math.pow(2, zoomDelta);
 
         visiblePoints.forEach(point => {
             // 根据密接次数动态调整点的大小（整体放大：最小5px，最大10px），先按对数缩放，再乘以轻微的 zoom 线性补偿
@@ -1293,8 +1296,8 @@ export class Visualization {
                 // 要保持实际面积不变，点的像素大小需要与缩放级别成反比：r(z) = r(baseZoom) * 2^(baseZoom - z)
                 const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
                 const baseZoom = 13;
-                const zoomDelta = baseZoom - zoom; // 注意：这里是 baseZoom - zoom，因为缩放级别越大，点应该越小
-                const zoomFactor = Math.pow(2, zoomDelta); // 2^(baseZoom - zoom)
+                const zoomDelta = baseZoom - zoom;
+                const zoomFactor = Math.pow(2, zoomDelta);
                 
                 markersData.forEach(({ lat, lng, count, color, popupContent }) => {
                     // 根据密接次数动态调整点的大小，与地图导览视图使用相同的逻辑
