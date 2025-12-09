@@ -15,6 +15,8 @@ export class Visualization {
         this.queryMarkersLayer = null; // 查询专用标记图层
         this.legendControl = null; // 图例控件
         this.queryLegendControl = null; // 查询地图图例控件
+        this.pointSizeControl = null; // 点大小控制滑块控件
+        this.pointSize = 9; // 点大小（默认值，范围3-15，默认在中间）
         this.displayMode = 'all'; // 显示模式: 'all' 全部, 'direct' 密接, 'indirect' 次密接
         this.queryContactType = 'direct'; // 查询结果当前显示类型: 'direct' 密接, 'indirect' 次密接
         this.currentDirectContacts = []; // 当前查询的密接数据
@@ -30,6 +32,7 @@ export class Visualization {
         this.baseTileLayer = null; // 主地图背景图层引用
         // 不再需要queryBaseTileLayer，统一使用baseTileLayer
         this.queryTrajectoryCanvasLayer = null; // 查询地图轨迹Canvas图层
+        
         
         this.mapAnimation = {
             currentTimestamp: null,
@@ -48,10 +51,6 @@ export class Visualization {
         this._sliderPendingTimestamp = null;  // 最近一次滑动对应的时间戳
         this._lastRequestedTimestamp = null;  // 最近一次实际请求的时间戳
         
-        // 缩放节流和防抖
-        this._zoomRedrawTimer = null;         // 缩放重绘节流定时器
-        this._zoomRedrawPending = false;      // 是否有待处理的缩放重绘
-        this._isZooming = false;              // 是否正在缩放中
         
         // 新增密接追踪
         this.previousTimestampContacts = new Set(); // 上一个时间戳的密接对集合
@@ -200,47 +199,8 @@ export class Visualization {
         // 可视化模式切换控件现在在HTML中，延迟初始化
         setTimeout(() => {
             this.createVisualizationControl();
+            this.createPointSizeControl();
         }, 100);
-        
-        // 监听缩放事件（由于使用固定大小，不再需要重新绘制）
-        this.map.on('zoomstart', () => {
-            this._isZooming = true;
-            // 缩放开始时优化标记渲染性能
-            if (this.markersLayer) {
-                this.markersLayer.eachLayer(layer => {
-                    if (layer instanceof L.Marker) {
-                        // 禁用交互，减少重绘开销
-                        const element = layer.getElement();
-                        if (element) {
-                            element.style.pointerEvents = 'none';
-                            element.style.willChange = 'transform';
-                            // 使用 CSS transform 优化，而不是重新计算位置
-                            element.style.transform = 'translateZ(0)'; // 启用硬件加速
-                        }
-                    }
-                });
-            }
-        });
-        
-        this.map.on('zoomend', () => {
-            this._isZooming = false;
-            // 恢复标记的交互和样式
-            if (this.markersLayer) {
-                this.markersLayer.eachLayer(layer => {
-                    if (layer instanceof L.Marker) {
-                        const element = layer.getElement();
-                        if (element) {
-                            element.style.pointerEvents = '';
-                            element.style.willChange = '';
-                        }
-                    }
-                });
-            }
-            // 缩放结束后重新绘制点，确保点大小基于正确的缩放级别
-            if (this.mapAnimation.currentTimestamp) {
-                this.drawMapAtTimestamp(this.mapAnimation.currentTimestamp);
-            }
-        });
     }
 
     /**
@@ -302,6 +262,133 @@ export class Visualization {
         });
         this.queryLegendControl = new Legend({ position: 'bottomright' });
         this.queryLegendControl.addTo(this.map);
+    }
+
+    /**
+     * 初始化点大小控制滑块（绑定到HTML中的滑块元素）
+     */
+    createPointSizeControl() {
+        const slider = document.getElementById('point-size-slider');
+        const resetBtn = document.getElementById('point-size-reset-btn');
+        
+        if (!slider || !resetBtn) {
+            console.warn('点大小控制元素未找到');
+            return;
+        }
+        
+        // 设置初始值
+        slider.value = this.pointSize.toString();
+        
+        // 保存对 Visualization 实例的引用
+        const self = this;
+        
+        // 滑块值改变事件
+        slider.addEventListener('input', (e) => {
+            const newSize = parseInt(e.target.value);
+            self.pointSize = newSize;
+            
+            // 重新绘制当前视图的点
+            if (self.visualizationMode === 'points') {
+                if (self.mapAnimation.currentTimestamp) {
+                    self.drawMapAtTimestamp(self.mapAnimation.currentTimestamp);
+                }
+                // 如果是查询视图且有查询数据，也重新绘制
+                if (self.currentQueryUserId && self.currentDirectContacts && self.currentSecondaryContacts) {
+                    self.drawQueryResultsMap(
+                        self.currentQueryUserId,
+                        self.currentDirectContacts,
+                        self.currentSecondaryContacts
+                    ).catch(err => {
+                        console.error('更新点大小后重新绘制查询结果失败:', err);
+                    });
+                }
+            }
+        });
+        
+        // 重置按钮事件
+        resetBtn.addEventListener('click', () => {
+            const defaultSize = 9; // 默认值（中间位置）
+            self.pointSize = defaultSize;
+            slider.value = defaultSize.toString();
+            
+            // 重新绘制当前视图的点
+            if (self.visualizationMode === 'points') {
+                if (self.mapAnimation.currentTimestamp) {
+                    self.drawMapAtTimestamp(self.mapAnimation.currentTimestamp);
+                }
+                // 如果是查询视图且有查询数据，也重新绘制
+                if (self.currentQueryUserId && self.currentDirectContacts && self.currentSecondaryContacts) {
+                    self.drawQueryResultsMap(
+                        self.currentQueryUserId,
+                        self.currentDirectContacts,
+                        self.currentSecondaryContacts
+                    ).catch(err => {
+                        console.error('重置点大小后重新绘制查询结果失败:', err);
+                    });
+                }
+            }
+        });
+        
+        // 添加滑块样式（只添加一次），与页面整体风格统一
+        if (!document.getElementById('point-size-slider-style')) {
+            const style = document.createElement('style');
+            style.id = 'point-size-slider-style';
+            style.textContent = `
+                .point-size-slider {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    background: #e2e8f0;
+                    border-radius: 2px;
+                    outline: none;
+                    height: 4px;
+                }
+                .point-size-slider::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #0f172a;
+                    cursor: pointer;
+                    border: 2px solid white;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    transition: all 0.2s ease;
+                }
+                .point-size-slider::-webkit-slider-thumb:hover {
+                    background: #1e293b;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+                }
+                .point-size-slider::-moz-range-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #0f172a;
+                    cursor: pointer;
+                    border: 2px solid white;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    transition: all 0.2s ease;
+                }
+                .point-size-slider::-moz-range-thumb:hover {
+                    background: #1e293b;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+                }
+                .point-size-slider::-ms-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #0f172a;
+                    cursor: pointer;
+                    border: 2px solid white;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                }
+                .point-size-slider::-ms-track {
+                    background: #e2e8f0;
+                    height: 4px;
+                    border-radius: 2px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
 
     /**
@@ -824,11 +911,6 @@ export class Visualization {
      */
     drawMapAtTimestamp(timestamp) {
         if (!this.map || !this.markersLayer) return;
-        
-        // 如果正在缩放中，延迟重绘（由 zoomend 事件处理）
-        if (this._isZooming) {
-            return;
-        }
 
         // 隐藏查询相关的图层（因为现在共享同一个地图）
         if (this.queryMarkersLayer) {
@@ -1032,32 +1114,32 @@ export class Visualization {
         });
         
         // 使用与地图绑定的 Leaflet 标记点来渲染
-        // 点大小随缩放级别变化，保持在地图上的实际面积不变
-        // Leaflet中，缩放级别每增加1，地图放大2倍
-        // 要保持实际面积不变，点的像素大小需要与缩放级别成反比：r(z) = r(baseZoom) * 2^(baseZoom - z)
-        const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
-        const baseZoom = 13;
-        const zoomDelta = baseZoom - zoom;
-        const zoomFactor = Math.pow(2, zoomDelta);
-
+        // 使用滑块控制的大小
+        const radius = this.pointSize;
+        
+        // 根据填充色生成同色系但更深的边框颜色
+        const getBorderColor = (fillColor) => {
+            // 密接（红色 #dc2626）-> 深红色边框 #991b1b (rose-800)
+            if (fillColor === config.colors.contact.direct) {
+                return '#991b1b';
+            }
+            // 次密接（黄色 #f59e0b）-> 深黄色边框 #d97706 (amber-600)
+            if (fillColor === config.colors.contact.indirect) {
+                return '#d97706';
+            }
+            // 默认返回深色版本
+            return fillColor;
+        };
+        
         visiblePoints.forEach(point => {
-            // 根据密接次数动态调整点的大小（整体放大：最小5px，最大10px），先按对数缩放，再乘以轻微的 zoom 线性补偿
-            const minRadius = 5;
-            const maxRadius = 10;
-            const minCount = 1;
-            const maxCount = 200;
-            const safeCount = Math.max(point.count, minCount);
-            const logCount = Math.log(1 + safeCount);
-            const logMax = Math.log(1 + maxCount);
-            const baseRadius = minRadius + (maxRadius - minRadius) * (logCount / logMax);
-            const radius = baseRadius * zoomFactor;
+            const borderColor = getBorderColor(point.color);
 
             // 底层圆点（真正与地图绑定的点）
             const circle = L.circleMarker([point.lat, point.lng], {
                 radius: radius,
                 fillColor: point.color,
-                color: '#ffffff',
-                weight: 1,
+                color: borderColor,
+                weight: 1.5,
                 opacity: 1,
                 fillOpacity: 0.9
             }).addTo(this.markersLayer);
@@ -1066,6 +1148,9 @@ export class Visualization {
 
             // 如果有多个接触点，在标记上显示数字（使用 divIcon 叠加）
             if (point.count > 1) {
+                const borderColor = getBorderColor(point.color);
+                // 根据点的大小动态调整字体大小
+                const fontSize = Math.max(9, Math.min(12, radius * 1.2));
                 const iconHtml = `
                     <div style="
                         display:inline-flex;
@@ -1075,10 +1160,14 @@ export class Visualization {
                         height:${radius * 2}px;
                         border-radius:50%;
                         background:${point.color};
-                        color:#fff;
-                        font-size:10px;
-                        border:1px solid #fff;
+                        color:#ffffff;
+                        font-size:${fontSize}px;
+                        font-weight:600;
+                        font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        text-shadow:0 1px 2px rgba(0,0,0,0.3);
+                        border:1px solid ${borderColor};
                         box-sizing:border-box;
+                        line-height:1;
                     ">
                         ${point.count}
                     </div>
@@ -1288,34 +1377,33 @@ export class Visualization {
                 });
             });
 
-            // 先调整地图视图，再绘制点（确保点大小基于正确的缩放级别）
+            // 先调整地图视图，再绘制点
             const drawMarkers = () => {
-                // 计算缩放因子，与地图导览视图保持一致
-                // 点大小随缩放级别变化，保持在地图上的实际面积不变
-                // Leaflet中，缩放级别每增加1，地图放大2倍
-                // 要保持实际面积不变，点的像素大小需要与缩放级别成反比：r(z) = r(baseZoom) * 2^(baseZoom - z)
-                const zoom = this.map && typeof this.map.getZoom === 'function' ? this.map.getZoom() : 13;
-                const baseZoom = 13;
-                const zoomDelta = baseZoom - zoom;
-                const zoomFactor = Math.pow(2, zoomDelta);
+                // 使用滑块控制的大小
+                const radius = this.pointSize;
+                
+                // 根据填充色生成同色系但更深的边框颜色
+                const getBorderColor = (fillColor) => {
+                    // 密接（红色 #dc2626）-> 深红色边框 #991b1b (rose-800)
+                    if (fillColor === config.colors.contact.direct) {
+                        return '#991b1b';
+                    }
+                    // 次密接（黄色 #f59e0b）-> 深黄色边框 #d97706 (amber-600)
+                    if (fillColor === config.colors.contact.indirect) {
+                        return '#d97706';
+                    }
+                    // 默认返回深色版本
+                    return fillColor;
+                };
                 
                 markersData.forEach(({ lat, lng, count, color, popupContent }) => {
-                    // 根据密接次数动态调整点的大小，与地图导览视图使用相同的逻辑
-                    const minRadius = 5;
-                    const maxRadius = 10;
-                    const minCount = 1;
-                    const maxCount = 200;
-                    const safeCount = Math.max(count, minCount);
-                    const logCount = Math.log(1 + safeCount);
-                    const logMax = Math.log(1 + maxCount);
-                    const baseRadius = minRadius + (maxRadius - minRadius) * (logCount / logMax);
-                    const radius = baseRadius * zoomFactor;
+                    const borderColor = getBorderColor(color);
                     
                     const marker = L.circleMarker([lat, lng], {
                         radius: radius,
                         fillColor: color,
-                        color: '#ffffff',
-                        weight: 1,
+                        color: borderColor,
+                        weight: 1.5,
                         opacity: 1,
                         fillOpacity: 0.9
                     }).addTo(this.queryMarkersLayer);
@@ -1334,12 +1422,6 @@ export class Visualization {
                 // 等待 fitBounds 完成后再绘制点
                 this.map.once('moveend', () => {
                     drawMarkers();
-                    this.isAdjustingQueryMapView = false;
-                });
-                this.map.once('zoomend', () => {
-                    if (this.queryContactMarkers.length === 0) {
-                        drawMarkers();
-                    }
                     this.isAdjustingQueryMapView = false;
                 });
             } else {

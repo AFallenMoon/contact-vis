@@ -273,7 +273,7 @@ export class App {
             setTimeout(() => {
                 if (this.visualization.map) {
                     this.visualization.map.invalidateSize();
-                    // 如果有查询结果，重新绘制以确保点大小正确
+                    // 如果有查询结果，重新绘制
                     if (this.currentQueryUserId && this.visualization.currentDirectContacts && this.visualization.currentSecondaryContacts) {
                         this.visualization.drawQueryResultsMap(
                             this.currentQueryUserId,
@@ -301,8 +301,7 @@ export class App {
             if (this.visualization.queryLegendControl && this.visualization.queryLegendControl._map === this.visualization.map) {
                 this.visualization.map.removeControl(this.visualization.queryLegendControl);
             }
-            
-            // 重新绘制地图导览视图，确保点大小基于正确的缩放级别
+            // 重新绘制地图导览视图
             setTimeout(() => {
                 if (this.visualization.map && this.dataLoader.allTimestamps.length > 0) {
                     this.visualization.map.invalidateSize();
